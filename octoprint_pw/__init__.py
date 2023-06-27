@@ -69,8 +69,7 @@ class PwPlugin(
                         None,
                     ]
                     self.hotend_buffer.append(hotend_row)
-                self._logger.info("BUFFER: {}".format(self.hotend_buffer))
-                self._logger.info("BUFF2: {}".format(self.bed_buffer))
+
                 if len(self.hotend_buffer) >= 128:
                     bed_data = {
                         "credentials": "7459df75-9f79-4dbf-9e7d-828aad9f95c9",
@@ -89,6 +88,7 @@ class PwPlugin(
                     hotend_response = requests.post(endpoint, json=hotend_data)
                     if bed_response.status_code == 200:
                         print("bed data sent")
+                        self._logger.info("Temperature data sent to server")
                     else:
                         print("bed data not sent due to ", bed_response.status_code)
 
