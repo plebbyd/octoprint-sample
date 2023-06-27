@@ -4,6 +4,8 @@ from __future__ import absolute_import
 import octoprint.plugin
 import time
 import requests
+import asyncio
+from threading import Thread
 
 endpoint = "http://139.144.16.65:8888/api/upload"
 
@@ -15,22 +17,22 @@ class PwPlugin(
     def __init__(self):
         self.bed_buffer = []
         self.hotend_buffer = []
+        self.sending = False
 
     def on_after_startup(self):
         self._logger.info("Print W")
+        self.run_thread = True
+        self._loop = Thread(target=self._run)
+        self._loop.daemon = True
+        self._loop.start()
 
     # runs every 1% progress during printing job
     # def on_print_progress(self, storage, path, progress):
     #     print("print progress confirm")
     #     return super().on_print_progress(storage, path, progress)
-
-    def on_event(self, event, payload):  # listen for printstarted
-        printer = self._printer
-        if event == "PrintStarted" or event == "PrintResumed":  # infinitely collect data on 5 second intervals while the printer is printing
-            if event == "PrintStarted": # if a new print job started, reset the buffer
-                self.bed_buffer = []
-                self.hotend_buffer = []
-            while printer.is_printing():
+    def _run(self):
+        while self.run_thread:
+            if self._printer.is_printing():
                 temperatures = printer.get_current_temperatures()
                 bed_temp = temperatures["bed"]
                 # part_id, part_model, command_temp, actual_temp, ki, kp, kd, command_power, actual_power, x_dmin, y_dmin
@@ -68,33 +70,48 @@ class PwPlugin(
                     ]
                     self.hotend_buffer.append(hotend_row)
 
-                time.sleep(5)
+                if len(self.hotend_buffer) >= 128:
+                    bed_data = {
+                        "credentials": "7459df75-9f79-4dbf-9e7d-828aad9f95c9",
+                        "image": None,
+                        "data": self.bed_buffer,
+                        "name": "bed",
+                    }
+                    hotend_data = {
+                        "credentials": "7459df75-9f79-4dbf-9e7d-828aad9f95c9",
+                        "image": None,
+                        "data": self.hotend_buffer,
+                        "name": "hotend",
+                    }
+
+                    bed_response = requests.post(endpoint, json=bed_data)
+                    hotend_response = requests.post(endpoint, json=hotend_data)
+                    if bed_response.status_code == 200:
+                        print("bed data sent")
+                    else:
+                        print("bed data not sent due to ", bed_response.status_code)
+
+                    if hotend_response.status_code == 200:
+                        print("hotend data sent")
+                    else:
+                        print("hotend data not sent due to ", hotend_response.status_code)
+                    self.hotend_buffer = []
+                    self.bed_buffer = []
+                time.sleep(0.25)
+            else:
+                time.sleep(5.0)
+
+
+    def on_event(self, event, payload):  # listen for printstarted
+        printer = self._printer
+        if event == "PrintStarted" or event == "PrintResumed":  # infinitely collect data on 5 second intervals while the printer is printing
+            if event == "PrintStarted": # if a new print job started, reset the buffer
+                self.bed_buffer = []
+                self.hotend_buffer = []
 
         if event == "PrintDone":  # send data to api once print is done
-            bed_data = {
-                "credentials": "7459df75-9f79-4dbf-9e7d-828aad9f95c9",
-                "image": None,
-                "data": self.bed_buffer,
-                "name": "test",
-            }
-            hotend_data = {
-                "credentials": "7459df75-9f79-4dbf-9e7d-828aad9f95c9",
-                "image": None,
-                "data": self.hotend_buffer,
-                "name": "test",
-            }
-
-            bed_response = requests.post(endpoint, json=bed_data)
-            hotend_response = requests.post(endpoint, json=hotend_data)
-            if bed_response.status_code == 200:
-                print("bed data sent")
-            else:
-                print("bed data not sent due to ", bed_response.status_code)
-
-            if hotend_response.status_code == 200:
-                print("hotend data sent")
-            else:
-                print("hotend data not sent due to ", hotend_response.status_code)
+            self.bed_buffer = []
+            self.hotend_buffer = []
 
         if event == "PrintCancelled" or "PrintFailed": # reset buffer
             self.bed_buffer = []
