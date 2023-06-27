@@ -33,7 +33,7 @@ class PwPlugin(
     def _run(self):
         while self.run_thread:
             if self._printer.is_printing():
-                temperatures = printer.get_current_temperatures()
+                temperatures = self._printer.get_current_temperatures()
                 bed_temp = temperatures["bed"]
                 # part_id, part_model, command_temp, actual_temp, ki, kp, kd, command_power, actual_power, x_dmin, y_dmin
                 bed_row = [
@@ -69,7 +69,8 @@ class PwPlugin(
                         None,
                     ]
                     self.hotend_buffer.append(hotend_row)
-
+                self._logger.info("BUFFER: {}".format(self.hotend_buffer))
+                self._logger.info("BUFF2: {}".format(self.bed_buffer))
                 if len(self.hotend_buffer) >= 128:
                     bed_data = {
                         "credentials": "7459df75-9f79-4dbf-9e7d-828aad9f95c9",
