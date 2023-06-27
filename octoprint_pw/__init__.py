@@ -5,7 +5,7 @@ import octoprint.plugin
 import time
 import requests
 
-endpoint = "http://139.144.16.15:8888/api/upload"
+endpoint = "http://139.144.16.65:8888/api/upload"
 
 class PwPlugin(
     octoprint.plugin.StartupPlugin,
